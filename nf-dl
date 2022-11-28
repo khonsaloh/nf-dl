@@ -1,0 +1,52 @@
+#!/bin/sh
+
+download_dir=$(mktemp -d --suffix=_font)
+install_path="$HOME/.local/share/fonts"
+url='https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest'
+
+#help() {
+#  echo "-s   install fonts system wide"
+#}
+#
+#while getopts 'sh' OPT; do
+#  case $OPT in
+#    s) install_path=/usr/share/fonts;;
+#    *) help; exit 1;;
+#  esac
+#done
+#shift $((OPTIND - 1))
+
+trap '' TSTP
+trap "rm -r $download_dir 2>/dev/null" HUP INT TERM EXIT PWR QUIT
+ 
+curl -Ls "$url" -o $download_dir/content.json || { echo "can not download json"; exit 1; }
+
+tag=$(jq -r '.tag_name' $download_dir/content.json) 
+fonts=$(jq -r '.assets[] | "\(.size)/\(.name)"' $download_dir/content.json | while IFS= read -r line; do
+ printf '%s\t\t' "${line%%/*}" | numfmt --to=iec; echo "${line##*/} "
+done | fzf -m --prompt='choose font: ' | awk '{print $NF}')
+
+[ "$fonts" ] || exit
+
+for font in $fonts; do
+    if ! fc-list -q "$font"; then
+      echo "downloading $font..."
+      download="https://github.com/ryanoasis/nerd-fonts/releases/download/$tag/$font"
+      curl -L --progress-bar $download -o $download_dir/$font || { echo "can not download $font"; continue; }
+      unzip -qqo $download_dir/$font -d $download_dir 
+    else
+      echo "$font already installed"
+    fi
+done
+
+echo "installing fonts..."
+find $download_dir \
+  ! -iname "*compatible*" \
+  ! -iname "LICENSE*" \
+  ! -iname "*.json" \
+  ! -iname "readme*" \
+  ! -iname "*.zip" \
+  -type f -exec cp {} $install_path \;
+
+echo "regenerating cache..."
+fc-cache -f
