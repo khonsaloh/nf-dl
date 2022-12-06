@@ -17,7 +17,7 @@ url='https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest'
 #shift $((OPTIND - 1))
 
 trap '' TSTP
-trap "rm -r $download_dir 2>/dev/null" HUP INT TERM EXIT PWR QUIT
+trap "rm -r $download_dir 2>/dev/null; exit 0" HUP INT TERM EXIT PWR QUIT
  
 curl -Ls "$url" -o $download_dir/content.json || { echo "can not download json"; exit 1; }
 
